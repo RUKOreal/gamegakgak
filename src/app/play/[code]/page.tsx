@@ -78,19 +78,77 @@ export default function PlayerPage() {
   const [lastKnownRound, setLastKnownRound] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
 
+  // Direct join states
+  const [isJoined, setIsJoined] = useState(false);
+  const [checkingRoom, setCheckingRoom] = useState(true);
+  const [roomError, setRoomError] = useState('');
+  const [inputNickname, setInputNickname] = useState('');
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [joinError, setJoinError] = useState('');
+  const [roomStatus, setRoomStatus] = useState('lobby');
+
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const stageTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const lastTickSecondRef = useRef(-1);
 
-  // Load player info from session
+  // Check room status and player registration on mount
   useEffect(() => {
-    const storedPlayerId = sessionStorage.getItem('playerId');
-    const storedNickname = sessionStorage.getItem('nickname');
-    if (storedPlayerId) setPlayerId(storedPlayerId);
-    if (storedNickname) setNickname(storedNickname);
-  }, []);
+    let isMounted = true;
+
+    async function checkRoomAndPlayer() {
+      if (!roomCode) {
+        setRoomError('Invalid room code');
+        setCheckingRoom(false);
+        return;
+      }
+
+      const storedPlayerId = sessionStorage.getItem('playerId');
+      const storedNickname = sessionStorage.getItem('nickname');
+      const storedRoomCode = sessionStorage.getItem('roomCode');
+
+      try {
+        const res = await fetch(`/api/rooms/${roomCode}`);
+        const data = await res.json();
+
+        if (!isMounted) return;
+
+        if (!res.ok || data.error || !data.room) {
+          setRoomError(data.error || 'ไม่พบห้องนี้ (Room not found)');
+          setCheckingRoom(false);
+          return;
+        }
+
+        setRoomStatus(data.room.status);
+
+        // Check if player is already registered in this room
+        const isRegistered =
+          storedPlayerId &&
+          storedRoomCode === roomCode &&
+          data.players?.some((p: { player_id: string }) => p.player_id === storedPlayerId);
+
+        if (isRegistered && storedPlayerId && storedNickname) {
+          setPlayerId(storedPlayerId);
+          setNickname(storedNickname);
+          setIsJoined(true);
+        } else {
+          // Player not joined yet
+          setIsJoined(false);
+        }
+      } catch (err) {
+        if (isMounted) setRoomError('ไม่สามารถเชื่อมต่อห้องได้ กรุณาลองใหม่อีกครั้ง');
+      } finally {
+        if (isMounted) setCheckingRoom(false);
+      }
+    }
+
+    checkRoomAndPlayer();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [roomCode]);
 
   // Check if demo mode
   useEffect(() => {
@@ -206,7 +264,7 @@ export default function PlayerPage() {
 
   // Subscribe to game events via Supabase broadcast OR polling
   useEffect(() => {
-    if (!roomCode) return;
+    if (!roomCode || !isJoined) return;
 
     if (demoMode) {
       pollRef.current = setInterval(() => {
@@ -219,6 +277,9 @@ export default function PlayerPage() {
         if (pollRef.current) clearInterval(pollRef.current);
       };
     } else {
+      // Sync state immediately upon joining
+      pollRoomState();
+
       const channel = supabase
         .channel(`room-${roomCode}`)
         .on('broadcast', { event: 'game_event' }, ({ payload }) => {
@@ -233,7 +294,7 @@ export default function PlayerPage() {
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomCode, demoMode, pollRoomState]);
+  }, [roomCode, isJoined, demoMode, pollRoomState]);
 
   // Handle game events from host (Supabase mode)
   const handleGameEvent = useCallback(
@@ -451,13 +512,171 @@ export default function PlayerPage() {
     setIsMuted(muted);
   };
 
+  const handleDirectJoin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputNickname.trim() || !roomCode) return;
+    setJoinLoading(true);
+    setJoinError('');
+
+    try {
+      const res = await fetch('/api/rooms/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomCode,
+          nickname: inputNickname.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setJoinError(data.error || 'Failed to join room');
+        return;
+      }
+
+      sessionStorage.setItem('playerId', data.playerId);
+      sessionStorage.setItem('nickname', data.nickname);
+      sessionStorage.setItem('roomId', data.roomId);
+      sessionStorage.setItem('roomCode', roomCode);
+
+      setPlayerId(data.playerId);
+      setNickname(data.nickname);
+      setIsJoined(true);
+      setPhase('waiting');
+      sounds.playStart();
+    } catch (err) {
+      setJoinError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      setJoinLoading(false);
+    }
+  };
+
   const handleExitRoom = () => {
     sessionStorage.removeItem('playerId');
     sessionStorage.removeItem('nickname');
+    sessionStorage.removeItem('roomId');
+    sessionStorage.removeItem('roomCode');
     window.location.href = '/';
   };
 
   // ─── Render ──────────────────────────────────────────────────────
+
+  // 1. Loading room check
+  if (checkingRoom) {
+    return (
+      <main className="flex-1 flex items-center justify-center p-4 min-h-screen">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-full border-4 border-purple-500/30 border-t-purple-500 animate-spin" />
+          <p className="text-[var(--text-muted)] text-sm">กำลังเชื่อมต่อห้อง {roomCode}...</p>
+        </div>
+      </main>
+    );
+  }
+
+  // 2. Room not found or connection error
+  if (roomError) {
+    return (
+      <main className="flex-1 flex items-center justify-center p-4 min-h-screen">
+        <div className="glass-card-static p-8 text-center max-w-sm w-full space-y-5 animate-fade-in-up">
+          <div className="w-16 h-16 mx-auto rounded-full bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-3xl">
+            ❌
+          </div>
+          <h2 className="text-2xl font-bold text-rose-400">ไม่พบห้องนี้</h2>
+          <p className="text-sm text-[var(--text-secondary)]">
+            รหัสห้อง <span className="font-mono font-bold text-white">{roomCode}</span> ไม่มีอยู่ หรือห้องอาจถูกปิดไปแล้ว
+          </p>
+          <button
+            onClick={() => window.location.href = '/'}
+            className="btn-secondary w-full"
+          >
+            กลับหน้าหลัก
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  // 3. Prompt player to join with nickname if entered via link
+  if (!isJoined) {
+    return (
+      <main className="flex-1 flex items-center justify-center p-4 min-h-screen">
+        <div className="glass-card-static p-8 max-w-sm w-full space-y-6 animate-fade-in-up">
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600 to-cyan-500 mb-2 shadow-lg animate-float">
+              <span className="text-3xl">🏍️</span>
+            </div>
+            <h1 className="text-2xl font-black brand-gradient" style={{ fontFamily: 'var(--font-display)' }}>
+              เข้าร่วมเล่นเกม
+            </h1>
+            <p className="text-xs text-[var(--text-secondary)]">
+              ห้อง: <span className="font-mono font-black text-[var(--accent-cyan)] tracking-wider">{roomCode}</span>
+            </p>
+          </div>
+
+          {roomStatus !== 'lobby' ? (
+            <div className="text-center space-y-4">
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
+                เกมในห้องนี้เริ่มไปแล้ว หรือจบลงแล้ว ไม่สามารถเข้าร่วมได้ในขณะนี้
+              </div>
+              <button
+                onClick={() => window.location.href = '/'}
+                className="btn-secondary w-full"
+              >
+                กลับหน้าหลัก
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleDirectJoin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+                  ชื่อเล่นของคุณ (Nickname)
+                </label>
+                <input
+                  type="text"
+                  value={inputNickname}
+                  onChange={(e) => setInputNickname(e.target.value)}
+                  placeholder="เช่น Decade, Build, Geats"
+                  maxLength={20}
+                  className="input-field text-center text-lg font-bold"
+                  autoFocus
+                />
+              </div>
+
+              {joinError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs text-center animate-fade-in">
+                  {joinError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={joinLoading || !inputNickname.trim()}
+                className="btn-primary w-full text-base py-3"
+                id="direct-join-btn"
+              >
+                {joinLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    กำลังเข้าร่วม...
+                  </span>
+                ) : (
+                  'เข้าร่วมห้อง 🚀'
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.location.href = '/'}
+                className="btn-secondary w-full text-sm py-2 opacity-70 hover:opacity-100"
+              >
+                กลับหน้าหลัก
+              </button>
+            </form>
+          )}
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 flex flex-col min-h-screen max-w-lg mx-auto w-full">

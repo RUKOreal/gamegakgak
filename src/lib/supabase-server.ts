@@ -13,15 +13,16 @@ let _supabaseAdmin: SupabaseClient | null = null;
 export function getSupabaseAdmin(): SupabaseClient {
   if (!_supabaseAdmin) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    if (!supabaseUrl || !supabaseServiceKey) {
+    if (!supabaseUrl || !supabaseKey) {
       throw new Error(
-        'Missing Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
+        'Missing Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY).'
       );
     }
 
-    _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    _supabaseAdmin = createClient(supabaseUrl, supabaseKey);
   }
   return _supabaseAdmin;
 }

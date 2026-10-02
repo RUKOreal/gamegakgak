@@ -9,9 +9,16 @@ import {
   updatePlayerScore,
 } from '@/lib/game-store';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const { roomCode, playerId, answerIndex, timeTakenMs } = await request.json();
+    const cleanRoomCode = typeof roomCode === 'string' ? roomCode.trim().toUpperCase() : '';
+
+    if (!cleanRoomCode || !playerId) {
+      return NextResponse.json({ error: 'roomCode and playerId are required' }, { status: 400 });
+    }
 
     if (isSupabaseConfigured()) {
       // ── Supabase Mode ──
@@ -20,8 +27,8 @@ export async function POST(request: NextRequest) {
       const { data: room, error: roomError } = await supabaseAdmin
         .from('rooms')
         .select('*')
-        .eq('code', roomCode.toUpperCase())
-        .single();
+        .eq('code', cleanRoomCode)
+        .maybeSingle();
 
       if (roomError || !room) {
         return NextResponse.json({ error: 'Room not found' }, { status: 404 });
@@ -37,7 +44,7 @@ export async function POST(request: NextRequest) {
         .eq('room_id', room.id)
         .eq('player_id', playerId)
         .eq('round', room.current_round)
-        .single();
+        .maybeSingle();
 
       if (existingAnswer) {
         return NextResponse.json({ error: 'Already answered' }, { status: 400 });
@@ -98,7 +105,7 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // ── Demo Mode (in-memory) ──
-      const room = getRoomByCode(roomCode.toUpperCase());
+      const room = getRoomByCode(cleanRoomCode);
       if (!room) {
         return NextResponse.json({ error: 'Room not found' }, { status: 404 });
       }

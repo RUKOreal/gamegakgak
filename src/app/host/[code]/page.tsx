@@ -576,6 +576,7 @@ export default function HostPage() {
             randomizeSection={randomizeAudioSection}
             onRandomizeSectionChange={setRandomizeAudioSection}
             onStartGame={handleStartGame}
+            demoMode={demoMode}
           />
         )}
 
@@ -631,6 +632,7 @@ function LobbyView({
   randomizeSection,
   onRandomizeSectionChange,
   onStartGame,
+  demoMode,
 }: {
   roomCode: string;
   players: Player[];
@@ -640,6 +642,7 @@ function LobbyView({
   randomizeSection: boolean;
   onRandomizeSectionChange: (val: boolean) => void;
   onStartGame: () => void;
+  demoMode?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const joinUrl = typeof window !== 'undefined' ? `${window.location.origin}/play/${roomCode}` : '';
@@ -654,6 +657,20 @@ function LobbyView({
 
   return (
     <div className="max-w-3xl mx-auto w-full space-y-8 animate-fade-in my-auto">
+      {/* Demo Mode Production Alert */}
+      {demoMode && (
+        <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs sm:text-sm text-left flex items-start gap-3 shadow-lg">
+          <span className="text-xl leading-none">⚠️</span>
+          <div className="space-y-1">
+            <p className="font-bold text-amber-300">กำลังทำงานใน Demo Mode (In-Memory)</p>
+            <p className="text-amber-200/80 leading-relaxed text-xs">
+              หากเปิดบน Vercel ผู้เล่นจากอุปกรณ์อื่นจะเข้าร่วมไม่ได้ (Serverless Function จะไม่แชร์ข้อมูลกัน)
+              กรุณาตั้งค่า Supabase Environment Variables บน Vercel เพื่อเปิดใช้งาน Real-time Multiplayer
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Code Display */}
       <div className="glass-card-static p-8 text-center space-y-4">
         <p className="text-[var(--text-muted)] text-sm uppercase tracking-widest">

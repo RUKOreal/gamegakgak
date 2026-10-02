@@ -9,11 +9,14 @@ import {
   clearRoomAnswers,
 } from '@/lib/game-store';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const { roomCode, hostId } = await request.json();
+    const cleanRoomCode = typeof roomCode === 'string' ? roomCode.trim().toUpperCase() : '';
 
-    if (!roomCode) {
+    if (!cleanRoomCode) {
       return NextResponse.json({ error: 'roomCode is required' }, { status: 400 });
     }
 
@@ -23,8 +26,8 @@ export async function POST(request: NextRequest) {
       const { data: room, error: roomError } = await supabaseAdmin
         .from('rooms')
         .select('*')
-        .eq('code', roomCode.toUpperCase())
-        .single();
+        .eq('code', cleanRoomCode)
+        .maybeSingle();
 
       if (roomError || !room) {
         return NextResponse.json({ error: 'Room not found' }, { status: 404 });
@@ -56,7 +59,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ success: true, status: 'lobby' });
     } else {
-      const room = getRoomByCode(roomCode.toUpperCase());
+      const room = getRoomByCode(cleanRoomCode);
       if (!room) {
         return NextResponse.json({ error: 'Room not found' }, { status: 404 });
       }

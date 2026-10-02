@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function HomePage() {
@@ -10,6 +10,20 @@ export default function HomePage() {
   const [nickname, setNickname] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const [demoMode, setDemoMode] = useState(false);
+  const [isProduction, setIsProduction] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/config')
+      .then((r) => r.json())
+      .then((data) => setDemoMode(data.demoMode))
+      .catch(() => setDemoMode(true));
+
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      setIsProduction(true);
+    }
+  }, []);
 
   const handleCreateRoom = async () => {
     setLoading(true);
@@ -24,6 +38,7 @@ export default function HomePage() {
       // Store host info in sessionStorage
       sessionStorage.setItem('hostId', data.hostId);
       sessionStorage.setItem('roomId', data.roomId);
+      sessionStorage.setItem('roomCode', data.roomCode);
       router.push(`/host/${data.roomCode}`);
     } catch {
       setError('Failed to create room. Please try again.');
@@ -54,6 +69,7 @@ export default function HomePage() {
       sessionStorage.setItem('playerId', data.playerId);
       sessionStorage.setItem('nickname', data.nickname);
       sessionStorage.setItem('roomId', data.roomId);
+      sessionStorage.setItem('roomCode', data.roomCode);
       router.push(`/play/${data.roomCode}`);
     } catch {
       setError('Failed to join room. Please try again.');
@@ -81,6 +97,21 @@ export default function HomePage() {
             Kamen Rider Song Guessing Game
           </p>
         </div>
+
+        {/* Demo Mode Production Alert */}
+        {demoMode && isProduction && (
+          <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs leading-relaxed animate-fade-in shadow-lg">
+            <div className="flex items-start gap-2.5">
+              <span className="text-lg leading-none">⚠️</span>
+              <div className="space-y-1 text-left">
+                <p className="font-bold text-amber-300">กำลังทำงานใน Demo Mode (In-Memory)</p>
+                <p className="text-amber-200/80">
+                  บน Vercel กรุณาตั้งค่า Supabase Environment Variables ใน Dashboard เพื่อให้ผู้เล่นเครื่องอื่นค้นหาห้องและเข้าร่วมได้
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Mode Selection */}
         {mode === 'menu' && (

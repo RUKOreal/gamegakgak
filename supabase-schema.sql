@@ -54,25 +54,46 @@ ALTER TABLE players ENABLE ROW LEVEL SECURITY;
 ALTER TABLE answers ENABLE ROW LEVEL SECURITY;
 
 -- 6. Create permissive policies (for game functionality)
--- Since we use the service role key for API routes, these policies
--- allow the anon key (used by clients) to read data for real-time subscriptions.
+-- Allow full access for anon and service_role keys to create/join rooms, answer questions, and sync
+DROP POLICY IF EXISTS "Allow read rooms" ON rooms;
+DROP POLICY IF EXISTS "Allow all rooms" ON rooms;
+CREATE POLICY "Allow all rooms" ON rooms
+  FOR ALL USING (true) WITH CHECK (true);
 
--- Rooms: anyone can read
-CREATE POLICY "Allow read rooms" ON rooms
-  FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow read players" ON players;
+DROP POLICY IF EXISTS "Allow all players" ON players;
+CREATE POLICY "Allow all players" ON players
+  FOR ALL USING (true) WITH CHECK (true);
 
--- Players: anyone can read
-CREATE POLICY "Allow read players" ON players
-  FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow read answers" ON answers;
+DROP POLICY IF EXISTS "Allow all answers" ON answers;
+CREATE POLICY "Allow all answers" ON answers
+  FOR ALL USING (true) WITH CHECK (true);
 
--- Answers: anyone can read
-CREATE POLICY "Allow read answers" ON answers
-  FOR SELECT USING (true);
+-- 7. Enable Realtime for tables (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'rooms'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE rooms;
+  END IF;
 
--- 7. Enable Realtime for tables
-ALTER PUBLICATION supabase_realtime ADD TABLE rooms;
-ALTER PUBLICATION supabase_realtime ADD TABLE players;
-ALTER PUBLICATION supabase_realtime ADD TABLE answers;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'players'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE players;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'answers'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE answers;
+  END IF;
+END $$;
 
 -- ============================================================
 -- Done! Your database is ready.

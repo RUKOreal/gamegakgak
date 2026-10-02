@@ -9,9 +9,16 @@ import {
   resetAllPlayerScores,
 } from '@/lib/game-store';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const { roomCode, hostId, songCount } = await request.json();
+    const cleanRoomCode = typeof roomCode === 'string' ? roomCode.trim().toUpperCase() : '';
+
+    if (!cleanRoomCode) {
+      return NextResponse.json({ error: 'roomCode is required' }, { status: 400 });
+    }
 
     // Validate and clamp song count (default 10, range 1–30)
     const count = Math.max(1, Math.min(30, Number(songCount) || 10));
@@ -29,8 +36,8 @@ export async function POST(request: NextRequest) {
       const { data: room, error: roomError } = await supabaseAdmin
         .from('rooms')
         .select('*')
-        .eq('code', roomCode.toUpperCase())
-        .single();
+        .eq('code', cleanRoomCode)
+        .maybeSingle();
 
       if (roomError || !room) {
         return NextResponse.json({ error: 'Room not found' }, { status: 404 });
@@ -80,7 +87,7 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // ── Demo Mode (in-memory) ──
-      const room = getRoomByCode(roomCode.toUpperCase());
+      const room = getRoomByCode(cleanRoomCode);
       if (!room) {
         return NextResponse.json({ error: 'Room not found' }, { status: 404 });
       }

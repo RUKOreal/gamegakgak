@@ -6,11 +6,16 @@ import {
   addPlayer,
 } from '@/lib/game-store';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const { roomCode, nickname } = await request.json();
 
-    if (!roomCode || !nickname) {
+    const cleanRoomCode = typeof roomCode === 'string' ? roomCode.replace(/\s+/g, '').toUpperCase() : '';
+    const cleanNickname = typeof nickname === 'string' ? nickname.trim() : '';
+
+    if (!cleanRoomCode || !cleanNickname) {
       return NextResponse.json(
         { error: 'Room code and nickname are required' },
         { status: 400 }
@@ -26,8 +31,8 @@ export async function POST(request: NextRequest) {
       const { data: room, error: roomError } = await supabaseAdmin
         .from('rooms')
         .select('*')
-        .eq('code', roomCode.toUpperCase())
-        .single();
+        .eq('code', cleanRoomCode)
+        .maybeSingle();
 
       if (roomError || !room) {
         return NextResponse.json({ error: 'Room not found' }, { status: 404 });
@@ -41,8 +46,8 @@ export async function POST(request: NextRequest) {
         .from('players')
         .select('id')
         .eq('room_id', room.id)
-        .eq('nickname', nickname)
-        .single();
+        .eq('nickname', cleanNickname)
+        .maybeSingle();
 
       if (existingPlayer) {
         return NextResponse.json({ error: 'Nickname already taken' }, { status: 400 });
@@ -51,7 +56,7 @@ export async function POST(request: NextRequest) {
       await supabaseAdmin.from('players').insert({
         room_id: room.id,
         player_id: playerId,
-        nickname: nickname.trim(),
+        nickname: cleanNickname,
         score: 0,
         is_host: false,
       });
@@ -60,11 +65,11 @@ export async function POST(request: NextRequest) {
         roomCode: room.code,
         roomId: room.id,
         playerId,
-        nickname: nickname.trim(),
+        nickname: cleanNickname,
       });
     } else {
       // ── Demo Mode (in-memory) ──
-      const room = getRoomByCode(roomCode.toUpperCase());
+      const room = getRoomByCode(cleanRoomCode);
       if (!room) {
         return NextResponse.json({ error: 'Room not found' }, { status: 404 });
       }
@@ -73,18 +78,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Game already in progress' }, { status: 400 });
       }
 
-      const existing = getPlayerByNickname(room.id, nickname);
+      const existing = getPlayerByNickname(room.id, cleanNickname);
       if (existing) {
         return NextResponse.json({ error: 'Nickname already taken' }, { status: 400 });
       }
 
-      addPlayer(room.id, playerId, nickname.trim(), false);
+      addPlayer(room.id, playerId, cleanNickname, false);
 
       return NextResponse.json({
         roomCode: room.code,
         roomId: room.id,
         playerId,
-        nickname: nickname.trim(),
+        nickname: cleanNickname,
       });
     }
   } catch (err) {

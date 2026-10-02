@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { QUESTIONS } from '@/lib/questions';
 import { isSupabaseConfigured, getRoomByCode } from '@/lib/game-store';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/game/question?roomCode=XXXX&round=1
  * Returns the current question options for a given room and round.
@@ -11,9 +13,10 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const roomCode = searchParams.get('roomCode');
+    const cleanRoomCode = (roomCode || '').trim().toUpperCase();
     const round = parseInt(searchParams.get('round') || '0');
 
-    if (!roomCode) {
+    if (!cleanRoomCode) {
       return NextResponse.json({ error: 'roomCode required' }, { status: 400 });
     }
 
@@ -23,8 +26,8 @@ export async function GET(request: NextRequest) {
       const { data: room } = await supabaseAdmin
         .from('rooms')
         .select('*')
-        .eq('code', roomCode.toUpperCase())
-        .single();
+        .eq('code', cleanRoomCode)
+        .maybeSingle();
 
       if (!room) {
         return NextResponse.json({ error: 'Room not found' }, { status: 404 });
@@ -53,7 +56,7 @@ export async function GET(request: NextRequest) {
       });
     } else {
       // Demo mode
-      const room = getRoomByCode(roomCode.toUpperCase());
+      const room = getRoomByCode(cleanRoomCode);
       if (!room) {
         return NextResponse.json({ error: 'Room not found' }, { status: 404 });
       }

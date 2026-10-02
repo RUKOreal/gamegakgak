@@ -5,6 +5,8 @@ import {
   addPlayer,
 } from '@/lib/game-store';
 
+export const dynamic = 'force-dynamic';
+
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';

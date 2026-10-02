@@ -213,12 +213,16 @@ export function clearRoomAnswers(roomId: string): void {
 // ─── Utility ────────────────────────────────────────────────────────
 
 export function isSupabaseConfigured(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
   return !!(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_URL !== '' &&
-    process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://YOUR_PROJECT_ID.supabase.co' &&
-    process.env.SUPABASE_SERVICE_ROLE_KEY &&
-    process.env.SUPABASE_SERVICE_ROLE_KEY !== '' &&
-    process.env.SUPABASE_SERVICE_ROLE_KEY !== 'your_service_role_key_here'
+    url &&
+    url !== '' &&
+    url !== 'https://YOUR_PROJECT_ID.supabase.co' &&
+    key &&
+    key !== '' &&
+    key !== 'your_service_role_key_here' &&
+    key !== 'your_anon_key_here'
   );
 }

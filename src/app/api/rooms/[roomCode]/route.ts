@@ -6,12 +6,19 @@ import {
   getRoundAnswers,
 } from '@/lib/game-store';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ roomCode: string }> }
 ) {
   try {
     const { roomCode } = await params;
+    const cleanCode = (roomCode || '').trim().toUpperCase();
+
+    if (!cleanCode) {
+      return NextResponse.json({ error: 'Room code required' }, { status: 400 });
+    }
 
     if (isSupabaseConfigured()) {
       // ── Supabase Mode ──
@@ -20,8 +27,8 @@ export async function GET(
       const { data: room, error: roomError } = await supabaseAdmin
         .from('rooms')
         .select('*')
-        .eq('code', roomCode.toUpperCase())
-        .single();
+        .eq('code', cleanCode)
+        .maybeSingle();
 
       if (roomError || !room) {
         return NextResponse.json({ error: 'Room not found' }, { status: 404 });
@@ -54,7 +61,7 @@ export async function GET(
       });
     } else {
       // ── Demo Mode (in-memory) ──
-      const room = getRoomByCode(roomCode.toUpperCase());
+      const room = getRoomByCode(cleanCode);
       if (!room) {
         return NextResponse.json({ error: 'Room not found' }, { status: 404 });
       }

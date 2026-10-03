@@ -88,6 +88,17 @@ export default function PlayerPage() {
   const revealAudioRef = useRef<HTMLAudioElement | null>(null);
   const isAudioUnlockedRef = useRef(false);
   const currentAudioUrlRef = useRef<string>('');
+  const offsetRoundRef = useRef<number>(-1);
+  const roundStartOffsetRef = useRef<number>(0);
+
+  // Helper to calculate a safe random start section in the track
+  const calculateRandomOffset = useCallback((dur: number): number => {
+    if (isNaN(dur) || dur <= 0) return 0;
+    // Round limit is ~15s, leave 18s at end so song doesn't finish prematurely
+    const maxStart = Math.max(0, Math.floor(dur - 18));
+    if (maxStart <= 5) return 0;
+    return 5 + Math.floor(Math.random() * (maxStart - 5));
+  }, []);
 
   // Proactive audio unlock for mobile Safari & Chrome
   const unlockAudio = useCallback(() => {
@@ -645,7 +656,28 @@ export default function PlayerPage() {
     }
   };
 
-  // Synchronize and play question audio during playing/answered phases
+  const handleRerollAudioSection = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const dur = audio.duration;
+    if (!dur || isNaN(dur)) return;
+
+    const newOffset = calculateRandomOffset(dur);
+    roundStartOffsetRef.current = newOffset;
+    try {
+      audio.currentTime = newOffset;
+      if (audio.paused && !isMuted) {
+        audio.play().then(() => {
+          setIsPlayingMusic(true);
+          setAutoplayBlocked(false);
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('Reroll seek failed:', e);
+    }
+  };
+
+  // Synchronize and play question audio during playing/answered phases (with randomized section)
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -655,13 +687,22 @@ export default function PlayerPage() {
       audio.muted = isMuted;
 
       const triggerPlayback = () => {
-        if (roundStartTime > 0 && audio.duration && !isNaN(audio.duration)) {
-          const elapsed = Math.max(0, (Date.now() - roundStartTime) / 1000);
-          if (elapsed < audio.duration && Math.abs(audio.currentTime - elapsed) > 2) {
+        const dur = audio.duration;
+        if (dur && !isNaN(dur) && dur > 0) {
+          // If this is a new round, calculate a fresh random section offset
+          if (offsetRoundRef.current !== currentRound) {
+            offsetRoundRef.current = currentRound;
+            roundStartOffsetRef.current = calculateRandomOffset(dur);
+          }
+
+          const elapsed = roundStartTime > 0 ? Math.max(0, (Date.now() - roundStartTime) / 1000) : 0;
+          const targetTime = Math.min(Math.max(0, dur - 1), roundStartOffsetRef.current + elapsed);
+
+          if (Math.abs(audio.currentTime - targetTime) > 2) {
             try {
-              audio.currentTime = elapsed;
+              audio.currentTime = targetTime;
             } catch (e) {
-              console.warn('Could not seek audio:', e);
+              console.warn('Could not seek audio to randomized section:', e);
             }
           }
         }
@@ -707,12 +748,14 @@ export default function PlayerPage() {
         }
       }
     } else if (phase === 'round_end' || phase === 'finished' || phase === 'waiting') {
+      offsetRoundRef.current = -1;
+      roundStartOffsetRef.current = 0;
       currentAudioUrlRef.current = '';
       audio.pause();
       audio.currentTime = 0;
       setIsPlayingMusic(false);
     }
-  }, [phase, question?.audioUrl, roundStartTime, isMuted]);
+  }, [phase, question?.audioUrl, roundStartTime, isMuted, currentRound, calculateRandomOffset]);
 
   // Pause reveal audio when exiting round_end phase
   useEffect(() => {
@@ -954,7 +997,7 @@ export default function PlayerPage() {
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-sm">🎵</span>
             <span className="text-xs font-semibold text-purple-200 truncate">
-              {isPlayingMusic ? 'กำลังเล่นเพลงคำถาม...' : isMuted ? 'ปิดเสียงเพลงอยู่' : 'เพลงหยุดชั่วคราว'}
+              {isPlayingMusic ? 'กำลังเล่นเพลง (สุ่มท่อน)...' : isMuted ? 'ปิดเสียงเพลงอยู่' : 'เพลงหยุดชั่วคราว'}
             </span>
             {isPlayingMusic && (
               <span className="flex items-center gap-0.5 shrink-0">
@@ -964,7 +1007,16 @@ export default function PlayerPage() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={handleRerollAudioSection}
+              className="px-2 py-0.5 rounded-md bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/30 text-purple-200 text-[11px] font-bold transition-all active:scale-95 flex items-center gap-1"
+              title="สุ่มท่อนใหม่"
+              id="player-reroll-btn"
+            >
+              <span>🎲</span>
+              <span className="hidden min-[360px]:inline">สุ่มท่อน</span>
+            </button>
             <button
               onClick={handleTogglePlayMusic}
               className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition-all active:scale-95"

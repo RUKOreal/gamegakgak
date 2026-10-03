@@ -79,21 +79,21 @@ export default function HomePage() {
   };
 
   return (
-    <main className="flex-1 flex items-center justify-center px-4 py-12">
+    <main className="flex-1 flex items-center justify-center px-4 py-8 sm:py-12">
       <div className="w-full max-w-lg">
         {/* Logo / Title */}
-        <div className="text-center mb-12 animate-fade-in-up">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-600 to-cyan-500 mb-6 animate-float">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <div className="text-center mb-8 sm:mb-12 animate-fade-in-up">
+          <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-purple-600 to-cyan-500 mb-4 sm:mb-6 animate-float">
+            <svg className="w-8 h-8 sm:w-10 sm:h-10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 18V5l12-2v13" />
               <circle cx="6" cy="18" r="3" />
               <circle cx="18" cy="16" r="3" />
             </svg>
           </div>
-          <h1 className="text-5xl font-black tracking-tight mb-3">
+          <h1 className="text-4xl sm:text-5xl font-black tracking-tight mb-3">
             <span className="brand-gradient">RIDER QUIZ</span>
           </h1>
-          <p className="text-[var(--text-secondary)] text-lg">
+          <p className="text-[var(--text-secondary)] text-base sm:text-lg">
             Kamen Rider Song Guessing Game
           </p>
         </div>
@@ -159,7 +159,7 @@ export default function HomePage() {
 
         {/* Join Form */}
         {mode === 'join' && (
-          <div className="glass-card-static p-8 space-y-6 animate-fade-in-up">
+          <div className="glass-card-static p-5 sm:p-8 space-y-5 sm:space-y-6 animate-fade-in-up">
             <div>
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
                 Room Code
@@ -170,7 +170,7 @@ export default function HomePage() {
                 onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
                 placeholder="Enter 6-digit code"
                 maxLength={6}
-                className="input-field text-center text-2xl tracking-[0.3em] font-bold uppercase"
+                className="input-field text-center text-xl sm:text-2xl tracking-[0.2em] sm:tracking-[0.3em] font-bold uppercase"
                 id="room-code-input"
                 autoFocus
               />
@@ -221,7 +221,7 @@ export default function HomePage() {
         )}
 
         {/* Footer */}
-        <div className="text-center mt-12 text-[var(--text-muted)] text-sm">
+        <div className="text-center mt-8 sm:mt-12 text-[var(--text-muted)] text-sm">
           <p>🎭 Guess the Kamen Rider opening theme!</p>
           <p className="mt-1">Play with friends in real-time</p>
         </div>

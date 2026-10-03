@@ -520,34 +520,35 @@ export default function HostPage() {
   return (
     <main className="flex-1 flex flex-col min-h-screen">
       {/* Header */}
-      <header className="glass-card-static px-6 py-4 mx-4 mt-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center text-xl shadow-lg">
+      <header className="glass-card-static px-3 py-2.5 sm:px-6 sm:py-4 mx-2 mt-2 sm:mx-4 sm:mt-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center text-lg sm:text-xl shadow-lg shrink-0">
             🏍️
           </div>
-          <div>
-            <h1 className="text-lg font-bold brand-gradient" style={{ fontFamily: 'var(--font-display)' }}>
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-lg font-bold brand-gradient" style={{ fontFamily: 'var(--font-display)' }}>
               RIDER QUIZ
             </h1>
-            <p className="text-xs text-[var(--text-muted)]">
+            <p className="hidden sm:block text-xs text-[var(--text-muted)] truncate">
               {demoMode ? '🎮 Demo Mode (In-Memory)' : '⚡ Real-time (Supabase)'} • Host Screen
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Mute button */}
           <button
             onClick={handleToggleMute}
             className="p-2 rounded-lg bg-[var(--surface-glass)] border border-[var(--border-subtle)] text-sm hover:border-[var(--border-accent)] transition-all"
             title={isMuted ? 'Unmute sounds' : 'Mute sounds'}
           >
-            {isMuted ? '🔇 Muted' : '🔊 Sound On'}
+            {isMuted ? '🔇' : '🔊'}
+            <span className="hidden sm:inline"> {isMuted ? 'Muted' : 'Sound On'}</span>
           </button>
 
           <div className="text-right">
-            <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Room Code</p>
-            <p className="text-2xl font-black text-[var(--accent-primary)] tracking-widest" style={{ fontFamily: 'var(--font-display)' }}>
+            <p className="text-[10px] sm:text-xs text-[var(--text-muted)] uppercase tracking-wider">Room Code</p>
+            <p className="text-lg sm:text-2xl font-black text-[var(--accent-primary)] tracking-widest" style={{ fontFamily: 'var(--font-display)' }}>
               {roomCode}
             </p>
           </div>
@@ -556,7 +557,7 @@ export default function HostPage() {
 
       {/* Error Message */}
       {error && (
-        <div className="mx-4 mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm flex items-center justify-between animate-fade-in">
+        <div className="mx-2 sm:mx-4 mt-3 sm:mt-4 p-3 sm:p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm flex items-center justify-between gap-3 animate-fade-in">
           <span>⚠️ {error}</span>
           <button onClick={() => setError('')} className="text-xs underline hover:text-white">
             Dismiss
@@ -565,7 +566,7 @@ export default function HostPage() {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col p-4 md:p-8">
+      <div className="flex-1 flex flex-col p-3 sm:p-4 md:p-8">
         {phase === 'lobby' && (
           <LobbyView
             roomCode={roomCode}
@@ -656,7 +657,7 @@ function LobbyView({
   };
 
   return (
-    <div className="max-w-3xl mx-auto w-full space-y-8 animate-fade-in my-auto">
+    <div className="max-w-3xl mx-auto w-full space-y-4 sm:space-y-8 animate-fade-in my-auto">
       {/* Demo Mode Production Alert */}
       {demoMode && (
         <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs sm:text-sm text-left flex items-start gap-3 shadow-lg">
@@ -672,13 +673,13 @@ function LobbyView({
       )}
 
       {/* Code Display */}
-      <div className="glass-card-static p-8 text-center space-y-4">
-        <p className="text-[var(--text-muted)] text-sm uppercase tracking-widest">
+      <div className="glass-card-static p-5 sm:p-8 text-center space-y-3 sm:space-y-4">
+        <p className="text-[var(--text-muted)] text-xs sm:text-sm uppercase tracking-widest break-all">
           Join at <span className="text-[var(--accent-cyan)] font-semibold">{typeof window !== 'undefined' ? window.location.host : 'localhost:3000'}</span> with code
         </p>
         <div className="room-code py-2 select-all">{roomCode}</div>
 
-        <div className="flex items-center justify-center gap-3 pt-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-3 pt-2">
           <button
             onClick={handleCopyLink}
             className="btn-secondary text-sm py-2 px-4"
@@ -699,9 +700,9 @@ function LobbyView({
       </div>
 
       {/* Players List */}
-      <div className="glass-card-static p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
+      <div className="glass-card-static p-4 sm:p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
             <span>👥 Connected Riders</span>
             <span className="text-sm px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-normal">
               {players.length}
@@ -732,7 +733,7 @@ function LobbyView({
                 <div className={`player-avatar ${AVATAR_COLORS[idx % AVATAR_COLORS.length]}`}>
                   {player.nickname.charAt(0).toUpperCase()}
                 </div>
-                <span className="font-semibold text-lg">{player.nickname}</span>
+                <span className="font-semibold text-base sm:text-lg truncate min-w-0">{player.nickname}</span>
                 <span className="ml-auto text-emerald-400 text-xs flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                   Ready
@@ -744,19 +745,19 @@ function LobbyView({
       </div>
 
       {/* Song Count Selector */}
-      <div className="glass-card-static p-6 space-y-4">
-        <h2 className="text-xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
+      <div className="glass-card-static p-4 sm:p-6 space-y-4">
+        <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
           <span>🎵 จำนวนเพลง</span>
         </h2>
         <p className="text-sm text-[var(--text-muted)]">
           เลือกจำนวนเพลงที่ต้องการเล่นในเกมนี้
         </p>
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3">
           {SONG_COUNT_OPTIONS.map((count) => (
             <button
               key={count}
               onClick={() => onSongCountChange(count)}
-              className={`relative p-4 rounded-xl border-2 text-center font-bold text-lg transition-all duration-200 ${
+              className={`relative p-3 sm:p-4 rounded-xl border-2 text-center font-bold text-lg transition-all duration-200 ${
                 songCount === count
                   ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] shadow-lg shadow-purple-500/20 scale-105'
                   : 'border-[var(--border-subtle)] bg-[var(--surface-glass)] text-[var(--text-secondary)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-glass-hover)]'
@@ -775,8 +776,8 @@ function LobbyView({
       </div>
 
       {/* Audio Playback Section Mode */}
-      <div className="glass-card-static p-6 space-y-4">
-        <h2 className="text-xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
+      <div className="glass-card-static p-4 sm:p-6 space-y-4">
+        <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
           <span>🎲 ท่อนเพลงที่เล่น</span>
         </h2>
         <p className="text-sm text-[var(--text-muted)]">
@@ -823,7 +824,7 @@ function LobbyView({
       <button
         onClick={onStartGame}
         disabled={loading || players.length === 0}
-        className="btn-primary w-full text-xl py-6 animate-pulse-glow"
+        className="btn-primary w-full text-base sm:text-xl py-4 sm:py-6 animate-pulse-glow"
         id="start-game-btn"
       >
         {loading ? (
@@ -885,7 +886,7 @@ function PlayingView({
 
         {/* Timer */}
         <div className="relative flex items-center justify-center">
-          <svg className="timer-ring w-20 h-20" viewBox="0 0 120 120">
+          <svg className="timer-ring w-16 h-16 sm:w-20 sm:h-20" viewBox="0 0 120 120">
             <circle
               cx="60"
               cy="60"
@@ -953,7 +954,7 @@ function PlayingView({
       </div>
 
       {/* Kahoot-style Options with Rider Photos (matches player's button colors) */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         {question.options.map((option, idx) => {
           const kahootColors = [
             { bg: '#e21b3c', shape: '▲', label: 'A' },
@@ -982,11 +983,11 @@ function PlayingView({
                   <span className="text-xl leading-none">{k.shape}</span>
                   <span className="text-xs uppercase tracking-wider font-extrabold">{k.label}</span>
                 </div>
-                <span className="text-[10px] uppercase tracking-widest font-semibold opacity-90">Kamen Rider</span>
+                <span className="hidden sm:inline text-[10px] uppercase tracking-widest font-semibold opacity-90">Kamen Rider</span>
               </div>
 
               {/* Rider Photo & Name Container */}
-              <div className="relative h-32 sm:h-36 w-full bg-zinc-950 flex items-center justify-center overflow-hidden">
+              <div className="relative h-28 sm:h-36 w-full bg-zinc-950 flex items-center justify-center overflow-hidden">
                 {riderImg ? (
                   <img
                     src={riderImg}
@@ -1005,7 +1006,7 @@ function PlayingView({
 
                 {/* Rider Name in bold banner */}
                 <div className="absolute bottom-1.5 inset-x-2.5 pointer-events-none">
-                  <p className="text-white font-black text-base sm:text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,1)] truncate leading-tight">
+                  <p className="text-white font-black text-sm sm:text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,1)] truncate leading-tight">
                     {option}
                   </p>
                 </div>
@@ -1084,19 +1085,19 @@ function RoundEndView({
   const maxAnswerCount = Math.max(1, ...answerCounts);
 
   return (
-    <div className="max-w-3xl mx-auto w-full space-y-6 animate-fade-in-up">
+    <div className="max-w-3xl mx-auto w-full space-y-4 sm:space-y-6 animate-fade-in-up">
       {/* ─── Kahoot Auto Countdown Header ─── */}
-      <div className="glass-card-static p-4 border-2 border-purple-500/30">
-        <div className="flex items-center justify-between gap-4 mb-2">
-          <div className="flex items-center gap-2">
+      <div className="glass-card-static p-3 sm:p-4 border-2 border-purple-500/30">
+        <div className="flex items-center justify-between gap-2 sm:gap-4 mb-2">
+          <div className="flex items-center gap-2 min-w-0">
             <span className="text-xl animate-pulse">
               {stage === 'reveal' ? '🎯' : '🏆'}
             </span>
             <div>
-              <p className="text-xs uppercase font-bold tracking-wider text-purple-300">
+              <p className="text-[10px] sm:text-xs uppercase font-bold tracking-wider text-purple-300">
                 {stage === 'reveal' ? 'เฉลยคำตอบ (Answer Reveal)' : 'ตารางคะแนน (Leaderboard)'} • Round {currentRound} / {totalRounds}
               </p>
-              <p className="text-sm font-bold text-white">
+              <p className="text-xs sm:text-sm font-bold text-white">
                 {stage === 'reveal'
                   ? `กำลังจะแสดงคะแนนอันดับใน ${Math.ceil(stageTimeLeft)} วินาที...`
                   : isLastRound
@@ -1127,15 +1128,15 @@ function RoundEndView({
 
       {/* ─── Stage 1: Reveal (เฉลย) ─── */}
       {stage === 'reveal' && (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-4 sm:space-y-6 animate-fade-in">
           {/* Answer Reveal Hero */}
-          <div className="glass-card-static p-6 text-center space-y-3 relative overflow-hidden">
+          <div className="glass-card-static p-4 pt-10 sm:p-6 text-center space-y-3 relative overflow-hidden">
             <div className="absolute top-3 right-4 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold animate-pulse">
               ✓ เฉลยข้อที่ {currentRound}
             </div>
 
             {/* 3D Vinyl Album Cover */}
-            <div className="flex justify-center my-3">
+            <div className="flex justify-center my-3 scale-[0.8] sm:scale-100 origin-center">
               <AlbumArt
                 songTitle={data.songTitle}
                 series={data.series}
@@ -1150,11 +1151,11 @@ function RoundEndView({
               />
             </div>
 
-            <h2 className="text-3xl font-black brand-gradient" style={{ fontFamily: 'var(--font-display)' }}>
+            <h2 className="text-2xl sm:text-3xl font-black brand-gradient break-words" style={{ fontFamily: 'var(--font-display)' }}>
               {data.songTitle}
             </h2>
-            <p className="text-2xl font-bold text-[var(--accent-cyan)]">{data.series}</p>
-            <p className="text-sm text-[var(--text-muted)]">Performed by {data.artist}</p>
+            <p className="text-lg sm:text-2xl font-bold text-[var(--accent-cyan)]">{data.series}</p>
+            <p className="text-xs sm:text-sm text-[var(--text-muted)]">Performed by {data.artist}</p>
 
             {/* Video Clip or Audio playback */}
             {data.youtubeId && data.youtubeId !== 'PLACEHOLDER' ? (
@@ -1178,7 +1179,7 @@ function RoundEndView({
           </div>
 
           {/* Kahoot Answer Distribution Grid */}
-          <div className="glass-card-static p-6 space-y-4">
+          <div className="glass-card-static p-4 sm:p-6 space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-white/50 flex items-center justify-between">
               <span>📊 ผลการตอบคำถาม</span>
               <span className="text-xs text-white/40">
@@ -1186,7 +1187,7 @@ function RoundEndView({
               </span>
             </h3>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
               {KAHOOT_THEME.map((k, idx) => {
                 const count = answerCounts[idx];
                 const isCorrect = idx === data.correctIndex;
@@ -1196,7 +1197,7 @@ function RoundEndView({
                 return (
                   <div
                     key={idx}
-                    className={`relative p-4 rounded-xl border-2 transition-all overflow-hidden ${
+                    className={`relative p-3 sm:p-4 rounded-xl border-2 transition-all overflow-hidden ${
                       isCorrect
                         ? 'border-emerald-400 bg-emerald-500/15 shadow-[0_0_20px_rgba(52,211,153,0.3)]'
                         : 'border-white/10 bg-white/5 opacity-50'
@@ -1209,7 +1210,7 @@ function RoundEndView({
                     />
 
                     <div className="relative z-10 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <span
                           className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-lg shrink-0 shadow-md"
                           style={{ backgroundColor: k.bg }}
@@ -1249,7 +1250,7 @@ function RoundEndView({
           </div>
 
           {/* Players answer round list */}
-          <div className="glass-card-static p-6 space-y-3">
+          <div className="glass-card-static p-4 sm:p-6 space-y-3">
             <h3 className="text-sm font-bold uppercase tracking-wider text-white/50">
               รายชื่อผู้เล่นที่ตอบรอบนี้
             </h3>
@@ -1268,7 +1269,7 @@ function RoundEndView({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm truncate">{result.nickname}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
                       <span className={`text-xs font-semibold ${result.is_correct ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {result.is_correct ? '✅ ตอบถูก' : '❌ ตอบผิด'}
                       </span>
@@ -1294,12 +1295,12 @@ function RoundEndView({
 
       {/* ─── Stage 2: Leaderboard (แสดงคะแนนอันดับ) ─── */}
       {stage === 'leaderboard' && (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-4 sm:space-y-6 animate-fade-in">
           {/* Kahoot-style Scoreboard Card */}
-          <div className="glass-card-static p-8 space-y-4">
-            <div className="text-center space-y-1 mb-6">
-              <span className="text-4xl animate-bounce">🏆</span>
-              <h2 className="text-3xl font-black brand-gradient" style={{ fontFamily: 'var(--font-display)' }}>
+          <div className="glass-card-static p-3 sm:p-8 space-y-4">
+            <div className="text-center space-y-1 mb-4 sm:mb-6">
+              <span className="text-3xl sm:text-4xl animate-bounce inline-block">🏆</span>
+              <h2 className="text-xl sm:text-3xl font-black brand-gradient" style={{ fontFamily: 'var(--font-display)' }}>
                 อันดับคะแนน (LEADERBOARD)
               </h2>
               <p className="text-sm text-[var(--text-muted)]">
@@ -1321,9 +1322,9 @@ function RoundEndView({
                 return (
                   <div
                     key={entry.player_id}
-                    className={`flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 ${
+                    className={`flex items-center gap-2 sm:gap-4 p-2.5 sm:p-4 rounded-2xl border transition-all duration-300 ${
                       isTop1
-                        ? 'border-amber-400/60 bg-gradient-to-r from-amber-500/20 via-purple-900/30 to-amber-500/10 shadow-[0_0_25px_rgba(245,158,11,0.25)] scale-[1.02]'
+                        ? 'border-amber-400/60 bg-gradient-to-r from-amber-500/20 via-purple-900/30 to-amber-500/10 shadow-[0_0_25px_rgba(245,158,11,0.25)] sm:scale-[1.02]'
                         : isTop2
                         ? 'border-slate-300/40 bg-gradient-to-r from-slate-400/15 via-purple-900/20 to-slate-400/5'
                         : isTop3
@@ -1332,23 +1333,25 @@ function RoundEndView({
                     }`}
                   >
                     {/* Rank Badge */}
-                    <div className="w-10 text-center font-black text-2xl shrink-0">
+                    <div className="w-7 sm:w-10 text-center font-black text-lg sm:text-2xl shrink-0">
                       {isTop1 ? '👑' : isTop2 ? '🥈' : isTop3 ? '🥉' : `#${idx + 1}`}
                     </div>
 
                     {/* Avatar */}
-                    <div className={`player-avatar w-12 h-12 text-lg shrink-0 ${AVATAR_COLORS[idx % AVATAR_COLORS.length]}`}>
-                      {entry.nickname.charAt(0).toUpperCase()}
+                    <div className="hidden sm:block shrink-0">
+                      <div className={`player-avatar w-12 h-12 text-lg ${AVATAR_COLORS[idx % AVATAR_COLORS.length]}`}>
+                        {entry.nickname.charAt(0).toUpperCase()}
+                      </div>
                     </div>
 
                     {/* Name & Streak */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-lg text-white truncate">
+                        <span className="font-bold text-sm sm:text-lg text-white truncate">
                           {entry.nickname}
                         </span>
                         {isCorrect && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 font-semibold flex items-center gap-1">
+                          <span className="hidden sm:flex text-xs px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 font-semibold items-center gap-1 shrink-0">
                             🔥 Hot
                           </span>
                         )}
@@ -1367,13 +1370,13 @@ function RoundEndView({
                           </span>
                         )}
                         {roundResult && (
-                          <span className="text-xs font-mono font-bold text-cyan-300 bg-cyan-950/60 border border-cyan-700/50 px-2 py-0.5 rounded-md shadow-sm">
+                          <span className="hidden sm:inline text-xs font-mono font-bold text-cyan-300 bg-cyan-950/60 border border-cyan-700/50 px-2 py-0.5 rounded-md shadow-sm">
                             ⏱️ {(roundResult.time_taken_ms / 1000).toFixed(2)}s
                           </span>
                         )}
                       </div>
                       <div className="flex items-baseline gap-1">
-                        <span className="text-2xl font-black text-amber-400" style={{ fontFamily: 'var(--font-display)' }}>
+                        <span className="text-lg sm:text-2xl font-black text-amber-400" style={{ fontFamily: 'var(--font-display)' }}>
                           {entry.score.toLocaleString()}
                         </span>
                         <span className="text-xs text-white/40">pts</span>
@@ -1410,10 +1413,10 @@ function FinishedView({
   const winner = leaderboard[0];
 
   return (
-    <div className="max-w-3xl mx-auto w-full space-y-6 animate-fade-in-up">
+    <div className="max-w-3xl mx-auto w-full space-y-4 sm:space-y-6 animate-fade-in-up">
       {/* Last round answer */}
       {lastRoundData && (
-        <div className="glass-card-static p-6 text-center space-y-3">
+        <div className="glass-card-static p-4 sm:p-6 text-center space-y-3">
           <p className="text-[var(--text-muted)] text-sm">Final Round Track</p>
           <div className="flex justify-center my-2">
             <AlbumArt
@@ -1435,17 +1438,17 @@ function FinishedView({
       )}
 
       {/* Winner Podium */}
-      <div className="glass-card-static p-10 text-center space-y-4">
-        <div className="text-7xl mb-2 animate-float">👑</div>
-        <p className="text-[var(--text-muted)] text-sm uppercase tracking-widest">
+      <div className="glass-card-static p-6 sm:p-10 text-center space-y-3 sm:space-y-4">
+        <div className="text-5xl sm:text-7xl mb-2 animate-float">👑</div>
+        <p className="text-[var(--text-muted)] text-xs sm:text-sm uppercase tracking-widest">
           Champion Kamen Rider
         </p>
         {winner ? (
           <>
-            <h2 className="text-5xl font-black brand-gradient" style={{ fontFamily: 'var(--font-display)' }}>
+            <h2 className="text-3xl sm:text-5xl font-black brand-gradient break-words" style={{ fontFamily: 'var(--font-display)' }}>
               {winner.nickname}
             </h2>
-            <p className="text-3xl font-bold text-amber-400 animate-score-pop">
+            <p className="text-2xl sm:text-3xl font-bold text-amber-400 animate-score-pop">
               {winner.score.toLocaleString()} pts
             </p>
           </>
@@ -1462,7 +1465,7 @@ function FinishedView({
         <button
           onClick={onPlayAgain}
           disabled={loading}
-          className="btn-primary w-full text-xl py-5 shadow-2xl flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all"
+          className="btn-primary w-full text-base sm:text-xl py-4 sm:py-5 shadow-2xl flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all"
           id="host-play-again-btn"
         >
           {loading ? (
@@ -1503,7 +1506,7 @@ function LeaderboardCard({
   const medals = ['🥇', '🥈', '🥉'];
 
   return (
-    <div className="glass-card-static p-6">
+    <div className="glass-card-static p-4 sm:p-6">
       <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'var(--font-display)' }}>
         {title}
       </h3>
@@ -1513,14 +1516,14 @@ function LeaderboardCard({
             key={entry.player_id}
             className={`leaderboard-row ${idx < 3 ? `rank-${idx + 1}` : ''}`}
           >
-            <span className="text-2xl w-10 text-center">
+            <span className="text-xl sm:text-2xl w-8 sm:w-10 text-center shrink-0">
               {idx < 3 ? medals[idx] : <span className="text-[var(--text-muted)] text-lg">#{entry.rank}</span>}
             </span>
             <div className={`player-avatar ${AVATAR_COLORS[idx % AVATAR_COLORS.length]}`}>
               {entry.nickname.charAt(0).toUpperCase()}
             </div>
-            <span className="font-semibold flex-1">{entry.nickname}</span>
-            <span className="text-xl font-bold text-amber-400">
+            <span className="font-semibold flex-1 min-w-0 truncate">{entry.nickname}</span>
+            <span className="text-lg sm:text-xl font-bold text-amber-400 shrink-0">
               {entry.score.toLocaleString()}
             </span>
           </div>

@@ -679,9 +679,9 @@ export default function PlayerPage() {
   }
 
   return (
-    <main className="flex-1 flex flex-col min-h-screen max-w-lg mx-auto w-full">
+    <main className="flex-1 flex flex-col min-h-screen max-w-lg md:max-w-2xl mx-auto w-full">
       {/* Compact Header */}
-      <header className="px-4 py-2 flex items-center justify-between bg-[rgba(0,0,0,0.3)] border-b border-white/5">
+      <header className="sticky top-0 z-20 backdrop-blur-md px-4 py-2 flex items-center justify-between bg-[rgba(0,0,0,0.3)] border-b border-white/5" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}>
         <div className="flex items-center gap-2">
           <div
             className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white shadow-md"
@@ -742,7 +742,7 @@ export default function PlayerPage() {
             </div>
 
             {/* Kahoot-style 2x2 Grid Answer Buttons with Rider Images */}
-            <div className="flex-1 grid grid-cols-2 gap-2.5 p-2">
+            <div className="flex-1 grid grid-cols-2 gap-2 sm:gap-3 p-2 sm:p-3">
               {question.options.map((option, idx) => {
                 const kahoot = KAHOOT_OPTIONS[idx];
                 const riderImg = getRiderImage(option);
@@ -767,7 +767,7 @@ export default function PlayerPage() {
                     style={{
                       borderColor: kahoot.color,
                       backgroundColor: 'rgba(15, 12, 35, 0.95)',
-                      minHeight: '135px',
+                      minHeight: 'clamp(120px, 32dvh, 260px)',
                     }}
                     id={`answer-option-${idx}`}
                   >
@@ -819,7 +819,7 @@ export default function PlayerPage() {
               {answerResult ? (
                 <>
                   {/* Result icon */}
-                  <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center text-6xl animate-score-pop ${
+                  <div className={`w-24 h-24 sm:w-32 sm:h-32 mx-auto rounded-full flex items-center justify-center text-5xl sm:text-6xl animate-score-pop ${
                     answerResult.isCorrect
                       ? 'bg-emerald-500/20 border-4 border-emerald-400'
                       : 'bg-rose-500/20 border-4 border-rose-400'
@@ -851,7 +851,7 @@ export default function PlayerPage() {
 
                   {/* Response Time Badge */}
                   {answerResult.timeTakenMs !== undefined && (
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 font-mono text-sm font-bold shadow-md animate-fade-in">
+                    <div className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-2 rounded-2xl bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 font-mono text-xs sm:text-sm font-bold shadow-md animate-fade-in">
                       <span>⏱️ เวลาในการกด:</span>
                       <span className="text-white text-lg font-black">
                         {(answerResult.timeTakenMs / 1000).toFixed(2)}
@@ -901,7 +901,7 @@ export default function PlayerPage() {
 
         {/* ─── Round End: Kahoot Auto Flow ─── */}
         {phase === 'round_end' && roundEndInfo && (
-          <div className="flex-1 space-y-4 p-4 animate-fade-in-up overflow-y-auto">
+          <div className="flex-1 space-y-4 p-3 sm:p-4 animate-fade-in-up overflow-y-auto">
             {/* Auto Countdown Progress Bar */}
             <div className="glass-card-static p-3 text-center border border-purple-500/30">
               <p className="text-xs font-bold text-purple-300 uppercase tracking-wider mb-1">
@@ -1034,7 +1034,7 @@ export default function PlayerPage() {
                     <p className="text-xs text-purple-300 uppercase tracking-widest font-semibold">
                       อันดับของคุณ
                     </p>
-                    <div className="text-4xl font-black brand-gradient flex items-center justify-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
+                    <div className="text-3xl sm:text-4xl font-black brand-gradient flex items-center justify-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
                       <span>{myRank === 1 ? '👑' : myRank === 2 ? '🥈' : myRank === 3 ? '🥉' : '🏍️'}</span>
                       <span>อันดับที่ #{myRank > 0 ? myRank : '-'}</span>
                     </div>
@@ -1078,7 +1078,7 @@ export default function PlayerPage() {
                           </span>
                           <div className="flex items-center gap-2 shrink-0">
                             {entry.last_time_taken_ms !== undefined && (
-                              <span className="text-[11px] font-mono font-bold text-cyan-300 bg-cyan-950/60 border border-cyan-700/50 px-2 py-0.5 rounded">
+                              <span className="hidden min-[380px]:inline text-[11px] font-mono font-bold text-cyan-300 bg-cyan-950/60 border border-cyan-700/50 px-2 py-0.5 rounded">
                                 ⏱️ {(entry.last_time_taken_ms / 1000).toFixed(2)}s
                               </span>
                             )}
@@ -1151,7 +1151,7 @@ export default function PlayerPage() {
             <div className="w-full space-y-3 pt-1">
               <button
                 onClick={handleExitRoom}
-                className="w-full py-4 px-6 rounded-2xl bg-white/10 hover:bg-rose-500/20 border-2 border-white/20 hover:border-rose-400 text-white font-bold text-lg transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 shadow-xl shadow-black/40"
+                className="w-full py-3.5 sm:py-4 px-4 sm:px-6 rounded-2xl bg-white/10 hover:bg-rose-500/20 border-2 border-white/20 hover:border-rose-400 text-white font-bold text-base sm:text-lg transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 shadow-xl shadow-black/40"
                 id="player-exit-btn"
               >
                 <span>🚪</span>

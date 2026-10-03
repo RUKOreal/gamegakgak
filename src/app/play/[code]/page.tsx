@@ -82,9 +82,60 @@ export default function PlayerPage() {
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [revealAudioPlaying, setRevealAudioPlaying] = useState(false);
+  const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const revealAudioRef = useRef<HTMLAudioElement | null>(null);
+  const isAudioUnlockedRef = useRef(false);
+  const currentAudioUrlRef = useRef<string>('');
+
+  // Proactive audio unlock for mobile Safari & Chrome
+  const unlockAudio = useCallback(() => {
+    sounds.unlock();
+
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if ((phase === 'playing' || phase === 'answered') && question?.audioUrl) {
+      if (audio.paused && !isMuted) {
+        audio.play().then(() => {
+          setIsPlayingMusic(true);
+          setAutoplayBlocked(false);
+        }).catch(() => {});
+      }
+    } else if (!isAudioUnlockedRef.current) {
+      const prevSrc = audio.getAttribute('src');
+      if (!prevSrc) {
+        audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+        audio.play().then(() => {
+          audio.pause();
+          audio.removeAttribute('src');
+          isAudioUnlockedRef.current = true;
+          setIsAudioUnlocked(true);
+        }).catch(() => {});
+      } else {
+        isAudioUnlockedRef.current = true;
+        setIsAudioUnlocked(true);
+      }
+    }
+  }, [phase, question?.audioUrl, isMuted]);
+
+  // Pre-unlock audio on any first interaction (touch/tap/click/key)
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      unlockAudio();
+    };
+
+    window.addEventListener('pointerdown', handleFirstInteraction, { passive: true });
+    window.addEventListener('touchstart', handleFirstInteraction, { passive: true });
+    window.addEventListener('keydown', handleFirstInteraction, { passive: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', handleFirstInteraction);
+      window.removeEventListener('touchstart', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+  }, [unlockAudio]);
 
   // Direct join states
   const [isJoined, setIsJoined] = useState(false);
@@ -270,24 +321,19 @@ export default function PlayerPage() {
     }
   }, [roomCode, phase, lastKnownRound, playerId]);
 
-  // Subscribe to game events via Supabase broadcast OR polling
+  // Subscribe to game events via Supabase broadcast with resilient background polling fallback
   useEffect(() => {
     if (!roomCode || !isJoined) return;
 
-    if (demoMode) {
-      pollRef.current = setInterval(() => {
-        pollRoomState();
-      }, 1000);
-
+    // Periodic polling fallback (every 1s in demoMode, every 2.5s in Supabase mode)
+    const intervalMs = demoMode ? 1000 : 2500;
+    pollRef.current = setInterval(() => {
       pollRoomState();
+    }, intervalMs);
 
-      return () => {
-        if (pollRef.current) clearInterval(pollRef.current);
-      };
-    } else {
-      // Sync state immediately upon joining
-      pollRoomState();
+    pollRoomState();
 
+    if (!demoMode) {
       const channel = supabase
         .channel(`room-${roomCode}`)
         .on('broadcast', { event: 'game_event' }, ({ payload }) => {
@@ -298,9 +344,14 @@ export default function PlayerPage() {
       channelRef.current = channel;
 
       return () => {
+        if (pollRef.current) clearInterval(pollRef.current);
         channel.unsubscribe();
       };
     }
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomCode, isJoined, demoMode, pollRoomState]);
 
@@ -480,6 +531,18 @@ export default function PlayerPage() {
   const handleAnswer = async (answerIndex: number) => {
     if (selectedAnswer !== null || phase !== 'playing') return;
 
+    // Explicit user gesture: start/resume question audio if paused or blocked
+    if (audioRef.current && !isMuted) {
+      if (audioRef.current.paused) {
+        audioRef.current.play().then(() => {
+          setIsPlayingMusic(true);
+          setAutoplayBlocked(false);
+        }).catch((err) => {
+          console.warn('Audio play on answer failed:', err);
+        });
+      }
+    }
+
     const timeTakenMs = Date.now() - roundStartTime;
     setSelectedAnswer(answerIndex);
     setPhase('answered');
@@ -538,10 +601,14 @@ export default function PlayerPage() {
   };
 
   const handleEnableAudio = () => {
+    sounds.unlock();
+    sounds.setMuted(false);
+    setIsMuted(false);
+    setIsAudioUnlocked(true);
+    isAudioUnlockedRef.current = true;
+
     if (audioRef.current) {
       audioRef.current.muted = false;
-      setIsMuted(false);
-      sounds.setMuted(false);
       audioRef.current.play().then(() => {
         setIsPlayingMusic(true);
         setAutoplayBlocked(false);
@@ -584,32 +651,63 @@ export default function PlayerPage() {
     if (!audio) return;
 
     if ((phase === 'playing' || phase === 'answered') && question?.audioUrl) {
-      const currentSrc = audio.getAttribute('src');
-      if (currentSrc !== question.audioUrl) {
-        audio.src = question.audioUrl;
-        audio.currentTime = 0;
-      }
-
-      if (roundStartTime > 0) {
-        const elapsed = Math.max(0, (Date.now() - roundStartTime) / 1000);
-        if (Math.abs(audio.currentTime - elapsed) > 2) {
-          audio.currentTime = elapsed;
-        }
-      }
-
+      const targetUrl = question.audioUrl;
       audio.muted = isMuted;
 
-      if (!isMuted) {
-        audio.play().then(() => {
-          setIsPlayingMusic(true);
-          setAutoplayBlocked(false);
-        }).catch((err) => {
-          console.warn('Player audio autoplay prevented:', err);
-          setAutoplayBlocked(true);
-          setIsPlayingMusic(false);
-        });
+      const triggerPlayback = () => {
+        if (roundStartTime > 0 && audio.duration && !isNaN(audio.duration)) {
+          const elapsed = Math.max(0, (Date.now() - roundStartTime) / 1000);
+          if (elapsed < audio.duration && Math.abs(audio.currentTime - elapsed) > 2) {
+            try {
+              audio.currentTime = elapsed;
+            } catch (e) {
+              console.warn('Could not seek audio:', e);
+            }
+          }
+        }
+
+        if (!isMuted) {
+          const playPromise = audio.play();
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                setIsPlayingMusic(true);
+                setAutoplayBlocked(false);
+              })
+              .catch((err) => {
+                console.warn('Player audio autoplay prevented:', err);
+                setAutoplayBlocked(true);
+                setIsPlayingMusic(false);
+              });
+          }
+        }
+      };
+
+      if (currentAudioUrlRef.current !== targetUrl) {
+        currentAudioUrlRef.current = targetUrl;
+        audio.src = targetUrl;
+        audio.load();
+
+        const onReady = () => {
+          audio.removeEventListener('canplay', onReady);
+          audio.removeEventListener('loadedmetadata', onReady);
+          triggerPlayback();
+        };
+
+        if (audio.readyState >= 2) {
+          triggerPlayback();
+        } else {
+          audio.addEventListener('canplay', onReady, { once: true });
+          audio.addEventListener('loadedmetadata', onReady, { once: true });
+        }
+      } else {
+        // Same track, resume if paused and not muted
+        if (audio.paused && !isMuted) {
+          triggerPlayback();
+        }
       }
-    } else {
+    } else if (phase === 'round_end' || phase === 'finished' || phase === 'waiting') {
+      currentAudioUrlRef.current = '';
       audio.pause();
       audio.currentTime = 0;
       setIsPlayingMusic(false);
@@ -630,6 +728,7 @@ export default function PlayerPage() {
     if (!inputNickname.trim() || !roomCode) return;
     setJoinLoading(true);
     setJoinError('');
+    unlockAudio();
 
     try {
       const res = await fetch('/api/rooms/join', {
@@ -793,6 +892,23 @@ export default function PlayerPage() {
 
   return (
     <main className="flex-1 flex flex-col min-h-screen max-w-lg md:max-w-2xl mx-auto w-full">
+      {/* Permanent Question Audio Element (stays mounted across all phases) */}
+      <audio
+        ref={audioRef}
+        preload="auto"
+        playsInline
+        onPlay={() => {
+          setIsPlayingMusic(true);
+          setAutoplayBlocked(false);
+        }}
+        onPause={() => setIsPlayingMusic(false)}
+        onEnded={() => setIsPlayingMusic(false)}
+        onError={(e) => {
+          console.warn('Audio playback error:', e);
+          setIsPlayingMusic(false);
+        }}
+      />
+
       {/* Compact Header */}
       <header className="sticky top-0 z-20 backdrop-blur-md px-4 py-2 flex items-center justify-between bg-[rgba(0,0,0,0.3)] border-b border-white/5" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}>
         <div className="flex items-center gap-2">
@@ -821,12 +937,57 @@ export default function PlayerPage() {
         </div>
       </header>
 
+      {/* Persistent Autoplay Blocked Banner (visible during playing and answered) */}
+      {autoplayBlocked && (phase === 'playing' || phase === 'answered') && (
+        <button
+          onClick={handleEnableAudio}
+          className="mx-3 my-2 p-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg animate-pulse active:scale-95 z-30"
+          id="enable-audio-banner"
+        >
+          <span>🔊 แตะที่นี่เพื่อเปิดเสียงเพลง (Tap to play song)</span>
+        </button>
+      )}
+
+      {/* Persistent Compact Player Audio Bar (visible during playing and answered) */}
+      {(phase === 'playing' || phase === 'answered') && question && (
+        <div className="mx-3 mb-1 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md flex items-center justify-between gap-2 shadow-sm">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm">🎵</span>
+            <span className="text-xs font-semibold text-purple-200 truncate">
+              {isPlayingMusic ? 'กำลังเล่นเพลงคำถาม...' : isMuted ? 'ปิดเสียงเพลงอยู่' : 'เพลงหยุดชั่วคราว'}
+            </span>
+            {isPlayingMusic && (
+              <span className="flex items-center gap-0.5 shrink-0">
+                <span className="w-1 h-2.5 bg-cyan-400 animate-pulse rounded-full" />
+                <span className="w-1 h-4 bg-purple-400 animate-pulse rounded-full" style={{ animationDelay: '0.2s' }} />
+                <span className="w-1 h-2 bg-pink-400 animate-pulse rounded-full" style={{ animationDelay: '0.4s' }} />
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleTogglePlayMusic}
+              className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition-all active:scale-95"
+            >
+              {isPlayingMusic ? '⏸️ หยุด' : '▶️ เล่น'}
+            </button>
+            <button
+              onClick={handleToggleMute}
+              className="px-1.5 py-0.5 rounded-md text-xs hover:bg-white/10 transition-all"
+              title={isMuted ? 'เปิดเสียง' : 'ปิดเสียง'}
+            >
+              {isMuted ? '🔇' : '🔊'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       <div className="flex-1 flex flex-col">
         {/* ─── Waiting ─── */}
         {phase === 'waiting' && (
           <div className="flex-1 flex items-center justify-center p-4">
-            <div className="text-center animate-fade-in-up space-y-4">
+            <div className="text-center animate-fade-in-up space-y-4 max-w-sm w-full">
               <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-purple-600/20 to-cyan-500/20 border border-purple-500/20 flex items-center justify-center text-4xl animate-pulse">
                 🏍️
               </div>
@@ -837,6 +998,33 @@ export default function PlayerPage() {
               <p className="text-sm text-[var(--text-muted)] max-w-xs mx-auto">
                 ดูหน้าจอหลัก — เกมจะเริ่มเร็วๆ นี้!
               </p>
+
+              {/* Sound check & mobile audio unlock button */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    unlockAudio();
+                    sounds.playStart();
+                    setIsAudioUnlocked(true);
+                    isAudioUnlockedRef.current = true;
+                  }}
+                  className={`w-full py-3 px-4 rounded-xl border text-xs sm:text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 shadow-lg active:scale-95 ${
+                    isAudioUnlocked
+                      ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-300 shadow-emerald-500/10'
+                      : 'bg-gradient-to-r from-purple-600/30 to-cyan-600/30 border-purple-500/40 text-purple-200 hover:border-purple-400 hover:bg-purple-600/40'
+                  }`}
+                  id="sound-check-btn"
+                >
+                  <span className="text-base">{isAudioUnlocked ? '✅' : '🔊'}</span>
+                  <span>{isAudioUnlocked ? 'ระบบเสียงพร้อมแล้ว (Sound Ready)' : 'แตะเพื่อเปิดเสียง / ทดสอบระบบเสียง'}</span>
+                </button>
+                <p className="text-[11px] text-white/50 mt-1.5">
+                  {isAudioUnlocked
+                    ? '🎵 เพลงคำถามจะเล่นอัตโนมัติเมื่อเริ่มเกม'
+                    : '💡 แนะนำให้แตะเปิดเสียง เพื่อให้เบราว์เซอร์มือถืออนุญาตให้เล่นเพลง'}
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -844,57 +1032,6 @@ export default function PlayerPage() {
         {/* ─── Playing: Kahoot-style Answer Buttons ─── */}
         {phase === 'playing' && question && (
           <div className="flex-1 flex flex-col animate-fade-in">
-            {/* Hidden Question Audio Element */}
-            <audio
-              ref={audioRef}
-              preload="auto"
-              onPlay={() => setIsPlayingMusic(true)}
-              onPause={() => setIsPlayingMusic(false)}
-              onEnded={() => setIsPlayingMusic(false)}
-            />
-
-            {/* Autoplay blocked banner */}
-            {autoplayBlocked && (
-              <button
-                onClick={handleEnableAudio}
-                className="mx-3 my-2 p-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg animate-pulse active:scale-95"
-              >
-                <span>🔊 แตะที่นี่เพื่อเปิดเสียงเพลง (Tap to play song)</span>
-              </button>
-            )}
-
-            {/* Compact Player Audio Bar */}
-            <div className="mx-2 mb-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md flex items-center justify-between gap-2 shadow-sm">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-sm">🎵</span>
-                <span className="text-xs font-semibold text-purple-200 truncate">
-                  {isPlayingMusic ? 'กำลังเล่นเพลงคำถาม...' : isMuted ? 'ปิดเสียงเพลงอยู่' : 'เพลงหยุดชั่วคราว'}
-                </span>
-                {isPlayingMusic && (
-                  <span className="flex items-center gap-0.5 shrink-0">
-                    <span className="w-1 h-2.5 bg-cyan-400 animate-pulse rounded-full" />
-                    <span className="w-1 h-4 bg-purple-400 animate-pulse rounded-full" style={{ animationDelay: '0.2s' }} />
-                    <span className="w-1 h-2 bg-pink-400 animate-pulse rounded-full" style={{ animationDelay: '0.4s' }} />
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={handleTogglePlayMusic}
-                  className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition-all active:scale-95"
-                >
-                  {isPlayingMusic ? '⏸️ หยุด' : '▶️ เล่น'}
-                </button>
-                <button
-                  onClick={handleToggleMute}
-                  className="px-1.5 py-0.5 rounded-md text-xs hover:bg-white/10 transition-all"
-                  title={isMuted ? 'เปิดเสียง' : 'ปิดเสียง'}
-                >
-                  {isMuted ? '🔇' : '🔊'}
-                </button>
-              </div>
-            </div>
-
             {/* Mini status bar */}
             <div className="flex items-center justify-between px-4 py-2">
               <span className="text-xs font-bold text-white/50">
@@ -1199,6 +1336,8 @@ export default function PlayerPage() {
                         <audio
                           ref={revealAudioRef}
                           src={roundEndInfo.audioUrl}
+                          preload="auto"
+                          playsInline
                           onPlay={() => setRevealAudioPlaying(true)}
                           onPause={() => setRevealAudioPlaying(false)}
                           onEnded={() => setRevealAudioPlaying(false)}

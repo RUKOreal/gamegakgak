@@ -35,6 +35,13 @@ class SoundManager {
     return this.isMuted;
   }
 
+  public unlock() {
+    const ctx = this.getContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+  }
+
   // Play single synthesized tone
   private playTone(freq: number, type: OscillatorType, duration: number, gainValue = 0.15, delay = 0) {
     if (this.isMuted) return;

@@ -31,6 +31,8 @@ interface RoundEndInfo {
   correctIndex: number;
   leaderboard: LeaderboardEntry[];
   roundResults: RoundResult[];
+  audioUrl?: string;
+  youtubeId?: string;
 }
 
 interface RoomState {
@@ -77,6 +79,12 @@ export default function PlayerPage() {
   const [demoMode, setDemoMode] = useState(false);
   const [lastKnownRound, setLastKnownRound] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const [isPlayingMusic, setIsPlayingMusic] = useState(false);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const [revealAudioPlaying, setRevealAudioPlaying] = useState(false);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const revealAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Direct join states
   const [isJoined, setIsJoined] = useState(false);
@@ -353,6 +361,8 @@ export default function PlayerPage() {
             correctIndex: payload.currentQuestion?.correctIndex ?? -1,
             leaderboard: payload.leaderboard || [],
             roundResults: payload.roundResults || [],
+            audioUrl: payload.currentQuestion?.audioUrl,
+            youtubeId: payload.currentQuestion?.youtubeId,
           });
           if (playerId && payload.leaderboard) {
             const me = payload.leaderboard.find(
@@ -386,6 +396,8 @@ export default function PlayerPage() {
               correctIndex: payload.currentQuestion?.correctIndex ?? -1,
               leaderboard: payload.leaderboard || [],
               roundResults: payload.roundResults || [],
+              audioUrl: payload.currentQuestion?.audioUrl,
+              youtubeId: payload.currentQuestion?.youtubeId,
             });
           }
           if (playerId && payload.leaderboard) {
@@ -508,9 +520,110 @@ export default function PlayerPage() {
   };
 
   const handleToggleMute = () => {
-    const muted = sounds.toggleMute();
-    setIsMuted(muted);
+    const nextMuted = !isMuted;
+    sounds.setMuted(nextMuted);
+    setIsMuted(nextMuted);
+    if (audioRef.current) {
+      audioRef.current.muted = nextMuted;
+      if (!nextMuted && (phase === 'playing' || phase === 'answered')) {
+        audioRef.current.play().then(() => {
+          setIsPlayingMusic(true);
+          setAutoplayBlocked(false);
+        }).catch(() => {});
+      }
+    }
+    if (revealAudioRef.current) {
+      revealAudioRef.current.muted = nextMuted;
+    }
   };
+
+  const handleEnableAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.muted = false;
+      setIsMuted(false);
+      sounds.setMuted(false);
+      audioRef.current.play().then(() => {
+        setIsPlayingMusic(true);
+        setAutoplayBlocked(false);
+      }).catch((err) => {
+        console.warn('Audio play failed:', err);
+      });
+    }
+  };
+
+  const handleTogglePlayMusic = () => {
+    if (!audioRef.current) return;
+    if (isPlayingMusic) {
+      audioRef.current.pause();
+      setIsPlayingMusic(false);
+    } else {
+      audioRef.current.play().then(() => {
+        setIsPlayingMusic(true);
+        setAutoplayBlocked(false);
+      }).catch(() => {});
+    }
+  };
+
+  const handleToggleRevealAudio = () => {
+    if (!revealAudioRef.current) return;
+    if (revealAudioPlaying) {
+      revealAudioRef.current.pause();
+      setRevealAudioPlaying(false);
+    } else {
+      revealAudioRef.current.currentTime = 0;
+      revealAudioRef.current.muted = isMuted;
+      revealAudioRef.current.play().then(() => {
+        setRevealAudioPlaying(true);
+      }).catch(() => {});
+    }
+  };
+
+  // Synchronize and play question audio during playing/answered phases
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if ((phase === 'playing' || phase === 'answered') && question?.audioUrl) {
+      const currentSrc = audio.getAttribute('src');
+      if (currentSrc !== question.audioUrl) {
+        audio.src = question.audioUrl;
+        audio.currentTime = 0;
+      }
+
+      if (roundStartTime > 0) {
+        const elapsed = Math.max(0, (Date.now() - roundStartTime) / 1000);
+        if (Math.abs(audio.currentTime - elapsed) > 2) {
+          audio.currentTime = elapsed;
+        }
+      }
+
+      audio.muted = isMuted;
+
+      if (!isMuted) {
+        audio.play().then(() => {
+          setIsPlayingMusic(true);
+          setAutoplayBlocked(false);
+        }).catch((err) => {
+          console.warn('Player audio autoplay prevented:', err);
+          setAutoplayBlocked(true);
+          setIsPlayingMusic(false);
+        });
+      }
+    } else {
+      audio.pause();
+      audio.currentTime = 0;
+      setIsPlayingMusic(false);
+    }
+  }, [phase, question?.audioUrl, roundStartTime, isMuted]);
+
+  // Pause reveal audio when exiting round_end phase
+  useEffect(() => {
+    if (phase !== 'round_end' && revealAudioRef.current) {
+      revealAudioRef.current.pause();
+      revealAudioRef.current.currentTime = 0;
+      setRevealAudioPlaying(false);
+    }
+  }, [phase]);
 
   const handleDirectJoin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -731,6 +844,57 @@ export default function PlayerPage() {
         {/* ─── Playing: Kahoot-style Answer Buttons ─── */}
         {phase === 'playing' && question && (
           <div className="flex-1 flex flex-col animate-fade-in">
+            {/* Hidden Question Audio Element */}
+            <audio
+              ref={audioRef}
+              preload="auto"
+              onPlay={() => setIsPlayingMusic(true)}
+              onPause={() => setIsPlayingMusic(false)}
+              onEnded={() => setIsPlayingMusic(false)}
+            />
+
+            {/* Autoplay blocked banner */}
+            {autoplayBlocked && (
+              <button
+                onClick={handleEnableAudio}
+                className="mx-3 my-2 p-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg animate-pulse active:scale-95"
+              >
+                <span>🔊 แตะที่นี่เพื่อเปิดเสียงเพลง (Tap to play song)</span>
+              </button>
+            )}
+
+            {/* Compact Player Audio Bar */}
+            <div className="mx-2 mb-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md flex items-center justify-between gap-2 shadow-sm">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-sm">🎵</span>
+                <span className="text-xs font-semibold text-purple-200 truncate">
+                  {isPlayingMusic ? 'กำลังเล่นเพลงคำถาม...' : isMuted ? 'ปิดเสียงเพลงอยู่' : 'เพลงหยุดชั่วคราว'}
+                </span>
+                {isPlayingMusic && (
+                  <span className="flex items-center gap-0.5 shrink-0">
+                    <span className="w-1 h-2.5 bg-cyan-400 animate-pulse rounded-full" />
+                    <span className="w-1 h-4 bg-purple-400 animate-pulse rounded-full" style={{ animationDelay: '0.2s' }} />
+                    <span className="w-1 h-2 bg-pink-400 animate-pulse rounded-full" style={{ animationDelay: '0.4s' }} />
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleTogglePlayMusic}
+                  className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition-all active:scale-95"
+                >
+                  {isPlayingMusic ? '⏸️ หยุด' : '▶️ เล่น'}
+                </button>
+                <button
+                  onClick={handleToggleMute}
+                  className="px-1.5 py-0.5 rounded-md text-xs hover:bg-white/10 transition-all"
+                  title={isMuted ? 'เปิดเสียง' : 'ปิดเสียง'}
+                >
+                  {isMuted ? '🔇' : '🔊'}
+                </button>
+              </div>
+            </div>
+
             {/* Mini status bar */}
             <div className="flex items-center justify-between px-4 py-2">
               <span className="text-xs font-bold text-white/50">
@@ -885,6 +1049,18 @@ export default function PlayerPage() {
                     </p>
                   </div>
 
+                  {/* Audio status reminder in answered phase */}
+                  {isPlayingMusic && (
+                    <div className="flex items-center justify-center gap-2 text-xs text-purple-300 font-semibold py-1">
+                      <span>🎵 เพลงกำลังเล่นคลออยู่...</span>
+                      <span className="flex items-center gap-0.5 shrink-0">
+                        <span className="w-1 h-2 bg-cyan-400 animate-pulse rounded-full" />
+                        <span className="w-1 h-3 bg-purple-400 animate-pulse rounded-full" style={{ animationDelay: '0.2s' }} />
+                        <span className="w-1 h-1.5 bg-pink-400 animate-pulse rounded-full" style={{ animationDelay: '0.4s' }} />
+                      </span>
+                    </div>
+                  )}
+
                   <p className="text-white/30 text-xs animate-pulse mt-2">
                     ⏳ รอ Host เฉลยคำตอบ...
                   </p>
@@ -1016,6 +1192,32 @@ export default function PlayerPage() {
                     </h3>
                     <p className="text-base font-bold text-cyan-400">{roundEndInfo.series}</p>
                     <p className="text-xs text-white/40">by {roundEndInfo.artist}</p>
+
+                    {/* Reveal Track Audio Player */}
+                    {roundEndInfo.audioUrl && (
+                      <div className="pt-2">
+                        <audio
+                          ref={revealAudioRef}
+                          src={roundEndInfo.audioUrl}
+                          onPlay={() => setRevealAudioPlaying(true)}
+                          onPause={() => setRevealAudioPlaying(false)}
+                          onEnded={() => setRevealAudioPlaying(false)}
+                        />
+                        <button
+                          onClick={handleToggleRevealAudio}
+                          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-200 text-xs font-bold transition-all active:scale-95 shadow-sm"
+                        >
+                          <span>{revealAudioPlaying ? '⏸️ หยุดฟัง' : '🎧 ฟังเพลงเฉลย'}</span>
+                          {revealAudioPlaying && (
+                            <span className="flex items-center gap-0.5">
+                              <span className="w-1 h-2.5 bg-cyan-400 animate-pulse rounded-full" />
+                              <span className="w-1 h-3.5 bg-purple-400 animate-pulse rounded-full" style={{ animationDelay: '0.15s' }} />
+                              <span className="w-1 h-2 bg-pink-400 animate-pulse rounded-full" style={{ animationDelay: '0.3s' }} />
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { QUESTIONS, calculateScore } from '@/lib/questions';
+import { QUESTIONS, calculateScore, ROUND_TIME_LIMIT_MS } from '@/lib/questions';
 import {
   isSupabaseConfigured,
   getRoomByCode,
@@ -59,7 +59,11 @@ export async function POST(request: NextRequest) {
       }
 
       const isCorrect = answerIndex === question.correctIndex;
-      const scoreEarned = calculateScore(timeTakenMs, isCorrect);
+      const validTimeTakenMs =
+        typeof timeTakenMs === 'number' && !isNaN(timeTakenMs)
+          ? Math.min(ROUND_TIME_LIMIT_MS, Math.max(50, Math.round(timeTakenMs)))
+          : ROUND_TIME_LIMIT_MS;
+      const scoreEarned = calculateScore(validTimeTakenMs, isCorrect);
 
       await supabaseAdmin.from('answers').insert({
         room_id: room.id,
@@ -67,7 +71,7 @@ export async function POST(request: NextRequest) {
         round: room.current_round,
         answer_index: answerIndex,
         is_correct: isCorrect,
-        time_taken_ms: timeTakenMs,
+        time_taken_ms: validTimeTakenMs,
         score_earned: scoreEarned,
       });
 
@@ -99,7 +103,7 @@ export async function POST(request: NextRequest) {
         success: true,
         isCorrect,
         scoreEarned,
-        timeTakenMs,
+        timeTakenMs: validTimeTakenMs,
         correctIndex: question.correctIndex,
         nickname: playerData?.nickname,
       });
@@ -127,9 +131,13 @@ export async function POST(request: NextRequest) {
       }
 
       const isCorrect = answerIndex === question.correctIndex;
-      const scoreEarned = calculateScore(timeTakenMs, isCorrect);
+      const validTimeTakenMs =
+        typeof timeTakenMs === 'number' && !isNaN(timeTakenMs)
+          ? Math.min(ROUND_TIME_LIMIT_MS, Math.max(50, Math.round(timeTakenMs)))
+          : ROUND_TIME_LIMIT_MS;
+      const scoreEarned = calculateScore(validTimeTakenMs, isCorrect);
 
-      addMemAnswer(room.id, playerId, room.current_round, answerIndex, isCorrect, timeTakenMs, scoreEarned);
+      addMemAnswer(room.id, playerId, room.current_round, answerIndex, isCorrect, validTimeTakenMs, scoreEarned);
 
       if (scoreEarned > 0) {
         updatePlayerScore(room.id, playerId, scoreEarned);
@@ -141,7 +149,7 @@ export async function POST(request: NextRequest) {
         success: true,
         isCorrect,
         scoreEarned,
-        timeTakenMs,
+        timeTakenMs: validTimeTakenMs,
         correctIndex: question.correctIndex,
         nickname: player?.nickname,
       });

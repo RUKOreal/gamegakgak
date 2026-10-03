@@ -90,6 +90,9 @@ export default function PlayerPage() {
   const currentAudioUrlRef = useRef<string>('');
   const offsetRoundRef = useRef<number>(-1);
   const roundStartOffsetRef = useRef<number>(0);
+  const questionRenderTimeRef = useRef<number>(0);
+  const serverClockOffsetRef = useRef<number>(0);
+  const stageStartTimeRef = useRef<number>(0);
 
   // Helper to calculate a safe random start section in the track
   const calculateRandomOffset = useCallback((dur: number): number => {
@@ -179,10 +182,17 @@ export default function PlayerPage() {
       const storedRoomCode = sessionStorage.getItem('roomCode');
 
       try {
+        const t0 = Date.now();
         const res = await fetch(`/api/rooms/${roomCode}`);
         const data = await res.json();
+        const t1 = Date.now();
 
         if (!isMounted) return;
+
+        if (data.serverTime) {
+          const rtt = Math.max(0, t1 - t0);
+          serverClockOffsetRef.current = Math.round(data.serverTime + rtt / 2 - t1);
+        }
 
         if (!res.ok || data.error || !data.room) {
           setRoomError(data.error || 'ไม่พบห้องนี้ (Room not found)');
@@ -232,9 +242,16 @@ export default function PlayerPage() {
   const pollRoomState = useCallback(async () => {
     if (!roomCode) return;
     try {
+      const t0 = Date.now();
       const res = await fetch(`/api/rooms/${roomCode}`);
       const data = await res.json();
+      const t1 = Date.now();
       if (!data.room) return;
+
+      if (data.serverTime) {
+        const rtt = Math.max(0, t1 - t0);
+        serverClockOffsetRef.current = Math.round(data.serverTime + rtt / 2 - t1);
+      }
 
       const room: RoomState = data.room;
 
@@ -257,16 +274,25 @@ export default function PlayerPage() {
           setPhase('playing');
           setTotalRounds(room.total_rounds);
           setCurrentRound(room.current_round);
-          setRoundStartTime(room.round_start_time || Date.now());
-          setTimeLeft(ROUND_TIME_LIMIT_MS / 1000);
+          const startTs = room.round_start_time || Date.now();
+          setRoundStartTime(startTs);
+          const syncedNow = Date.now() + serverClockOffsetRef.current;
+          const elapsedSec = Math.max(0, (syncedNow - startTs) / 1000);
+          setTimeLeft(Math.max(0, (ROUND_TIME_LIMIT_MS / 1000) - elapsedSec));
           setSelectedAnswer(null);
           setAnswerResult(null);
           setRoundEndInfo(null);
           setLastKnownRound(room.current_round);
 
+          const qT0 = Date.now();
           const qRes = await fetch(`/api/game/question?roomCode=${roomCode}&round=${room.current_round}`);
+          const qT1 = Date.now();
           if (qRes.ok) {
             const qData = await qRes.json();
+            if (qData.serverTime) {
+              const rtt = Math.max(0, qT1 - qT0);
+              serverClockOffsetRef.current = Math.round(qData.serverTime + rtt / 2 - qT1);
+            }
             setQuestion(qData.question);
           }
         }
@@ -285,14 +311,17 @@ export default function PlayerPage() {
             if (me) setMyTotalScore(me.score);
           }
 
-          // Calculate current stage & countdown
-          const elapsed = endData.roundEndTime ? (Date.now() - endData.roundEndTime) / 1000 : 0;
+          // Calculate current stage & countdown using synced clock
+          const syncedNow = Date.now() + serverClockOffsetRef.current;
+          const elapsed = endData.roundEndTime ? Math.max(0, (syncedNow - endData.roundEndTime) / 1000) : 0;
           if (elapsed < 5) {
             setRoundEndStage('reveal');
             setStageTimerLeft(Math.max(0, 5 - elapsed));
+            stageStartTimeRef.current = Date.now() - (elapsed * 1000);
           } else {
             setRoundEndStage('leaderboard');
             setStageTimerLeft(Math.max(0, 11 - elapsed));
+            stageStartTimeRef.current = Date.now() - ((elapsed - 5) * 1000);
           }
         }
       } else if (room.status === 'finished' && phase !== 'finished') {
@@ -384,34 +413,41 @@ export default function PlayerPage() {
           setLastKnownRound(0);
           break;
 
-        case 'game_started':
+        case 'game_started': {
           sounds.playStart();
           setPhase('playing');
           setTotalRounds(payload.totalRounds);
           setCurrentRound(payload.currentRound);
           setQuestion(payload.question);
           setRoundStartTime(payload.startTime);
-          setTimeLeft(ROUND_TIME_LIMIT_MS / 1000);
+          const syncedNowStart = Date.now() + serverClockOffsetRef.current;
+          const elapsedSecStart = Math.max(0, (syncedNowStart - payload.startTime) / 1000);
+          setTimeLeft(Math.max(0, (ROUND_TIME_LIMIT_MS / 1000) - elapsedSecStart));
           setSelectedAnswer(null);
           setAnswerResult(null);
           break;
+        }
 
-        case 'new_question':
+        case 'new_question': {
           sounds.playStart();
           setPhase('playing');
           setCurrentRound(payload.currentRound);
           setQuestion(payload.question);
           setRoundStartTime(payload.startTime);
-          setTimeLeft(ROUND_TIME_LIMIT_MS / 1000);
+          const syncedNowQ = Date.now() + serverClockOffsetRef.current;
+          const elapsedSecQ = Math.max(0, (syncedNowQ - payload.startTime) / 1000);
+          setTimeLeft(Math.max(0, (ROUND_TIME_LIMIT_MS / 1000) - elapsedSecQ));
           setSelectedAnswer(null);
           setAnswerResult(null);
           setRoundEndInfo(null);
           break;
+        }
 
         case 'round_end':
           setPhase('round_end');
           setRoundEndStage(payload.stage || 'reveal');
           setStageTimerLeft(payload.duration || 5);
+          stageStartTimeRef.current = Date.now();
           setRoundEndInfo({
             songTitle: payload.currentQuestion?.songTitle || '',
             series: payload.currentQuestion?.series || '',
@@ -438,6 +474,7 @@ export default function PlayerPage() {
           if (payload.stage === 'leaderboard') {
             setRoundEndStage('leaderboard');
             setStageTimerLeft(payload.duration || 6);
+            stageStartTimeRef.current = Date.now();
             sounds.playStart();
           }
           break;
@@ -474,23 +511,39 @@ export default function PlayerPage() {
     [playerId]
   );
 
-  // Auto Countdown timer for round_end stages in player
+  // High-precision question render time for reaction tracking
+  useEffect(() => {
+    if (phase === 'playing' && question) {
+      questionRenderTimeRef.current = performance.now();
+    }
+  }, [phase, question]);
+
+  // Auto Countdown timer for round_end stages in player (resilient to mobile timer throttling)
   useEffect(() => {
     if (phase !== 'round_end') {
       if (stageTimerRef.current) clearInterval(stageTimerRef.current);
       return;
     }
 
+    if (!stageStartTimeRef.current) {
+      stageStartTimeRef.current = Date.now();
+    }
+
     stageTimerRef.current = setInterval(() => {
-      setStageTimerLeft((prev) => {
-        const next = Math.max(0, prev - 0.1);
-        if (next <= 0 && roundEndStage === 'reveal') {
+      const elapsed = (Date.now() - stageStartTimeRef.current) / 1000;
+      if (roundEndStage === 'reveal') {
+        const remaining = Math.max(0, 5 - elapsed);
+        setStageTimerLeft(remaining);
+        if (remaining <= 0) {
           setRoundEndStage('leaderboard');
+          setStageTimerLeft(6);
+          stageStartTimeRef.current = Date.now();
           sounds.playStart();
-          return 6;
         }
-        return next;
-      });
+      } else {
+        const remaining = Math.max(0, 6 - elapsed);
+        setStageTimerLeft(remaining);
+      }
     }, 100);
 
     return () => {
@@ -498,7 +551,7 @@ export default function PlayerPage() {
     };
   }, [phase, roundEndStage]);
 
-  // Timer countdown
+  // Timer countdown (calibrated to synchronized server time)
   useEffect(() => {
     if (phase !== 'playing' || !roundStartTime) {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -506,7 +559,8 @@ export default function PlayerPage() {
     }
 
     timerRef.current = setInterval(() => {
-      const elapsed = Date.now() - roundStartTime;
+      const syncedNow = Date.now() + serverClockOffsetRef.current;
+      const elapsed = syncedNow - roundStartTime;
       const remaining = Math.max(0, (ROUND_TIME_LIMIT_MS - elapsed) / 1000);
       setTimeLeft(remaining);
 
@@ -554,7 +608,15 @@ export default function PlayerPage() {
       }
     }
 
-    const timeTakenMs = Date.now() - roundStartTime;
+    // Synchronized reaction time:
+    // Calibrate Date.now() using serverClockOffsetRef to match the server roundStartTime precisely.
+    // Clamped safely between 100ms and ROUND_TIME_LIMIT_MS.
+    const syncedNow = Date.now() + serverClockOffsetRef.current;
+    const syncedElapsedMs = roundStartTime > 0
+      ? (syncedNow - roundStartTime)
+      : (questionRenderTimeRef.current > 0 ? (performance.now() - questionRenderTimeRef.current) : 1000);
+    const timeTakenMs = Math.min(ROUND_TIME_LIMIT_MS, Math.max(100, Math.round(syncedElapsedMs)));
+
     setSelectedAnswer(answerIndex);
     setPhase('answered');
 

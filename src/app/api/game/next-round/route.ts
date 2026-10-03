@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
             }
           : null,
         startTime,
+        serverTime: startTime,
       });
     } else {
       // ── Demo Mode (in-memory) ──
@@ -127,6 +128,7 @@ export async function POST(request: NextRequest) {
             }
           : null,
         startTime,
+        serverTime: startTime,
       });
     }
   } catch (err) {

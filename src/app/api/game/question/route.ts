@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
           audioUrl: question.audioUrl,
           youtubeId: question.youtubeId,
         },
+        serverTime: Date.now(),
       });
     } else {
       // Demo mode
@@ -80,6 +81,7 @@ export async function GET(request: NextRequest) {
           audioUrl: question.audioUrl,
           youtubeId: question.youtubeId,
         },
+        serverTime: Date.now(),
       });
     }
   } catch (err) {

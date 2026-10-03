@@ -58,6 +58,7 @@ export async function GET(
         players,
         answeredCount: answeredCount || 0,
         totalPlayers: nonHostPlayers.length,
+        serverTime: Date.now(),
       });
     } else {
       // ── Demo Mode (in-memory) ──
@@ -76,6 +77,7 @@ export async function GET(
         answeredCount: currentRoundAnswers.length,
         totalPlayers: nonHostPlayers.length,
         roundEndData: room.round_end_data || null,
+        serverTime: Date.now(),
       });
     }
   } catch (err) {
